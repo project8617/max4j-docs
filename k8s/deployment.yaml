@@ -5,6 +5,7 @@ metadata:
   namespace: default
   labels:
     app: max4j-docs
+    app.kubernetes.io/version: "0.4.2"
 spec:
   replicas: 1
   revisionHistoryLimit: 5
@@ -20,10 +21,11 @@ spec:
     metadata:
       labels:
         app: max4j-docs
+        app.kubernetes.io/version: "0.4.2"
     spec:
       containers:
         - name: max4j-docs
-          image: cr.yandex/crplfa8eqvo7nvc0abpg/app/max4j-docs:main
+          image: cr.yandex/crplfa8eqvo7nvc0abpg/app/max4j-docs:0.4.2
           imagePullPolicy: Always
           ports:
             - name: http
