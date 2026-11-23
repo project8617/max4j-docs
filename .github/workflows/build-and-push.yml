@@ -63,7 +63,6 @@ jobs:
             key_file="$(mktemp)"
             trap 'rm -f "$key_file"' EXIT
             printf '%s' "$YC_CLI_KEY" | base64 -d > "$key_file"
-            printf 'Registry service account ID: %s\n' "$(jq -r .service_account_id "$key_file")"
             /home/runner/yandex-cloud/bin/yc config set service-account-key "$key_file"
             IAM_TOKEN=$(/home/runner/yandex-cloud/bin/yc iam create-token)
           fi
