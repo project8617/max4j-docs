@@ -1,0 +1,73 @@
+name: Build and push documentation image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to publish
+        required: false
+        default: main
+        type: string
+  workflow_call:
+    inputs:
+      image_tag:
+        required: false
+        type: string
+    secrets:
+      YC_CLI_KEY:
+        required: false
+      YC_IAM_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    runs-on: ubuntu-24.04
+    env:
+      IMAGE: cr.yandex/crplfa8eqvo7nvc0abpg/app/max4j-docs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Validate image tag
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag || 'main' }}
+        run: '[[ "$IMAGE_TAG" =~ ^[A-Za-z0-9._-]+$ ]]'
+      - name: Build image
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag || 'main' }}
+        run: docker build -t "$IMAGE:$IMAGE_TAG" .
+      - name: Set up Yandex Cloud CLI
+        env:
+          YC_IAM_TOKEN: ${{ secrets.YC_IAM_TOKEN }}
+        run: |
+          if [[ -n "$YC_IAM_TOKEN" ]]; then exit 0; fi
+          curl --fail --connect-timeout 10 --max-time 60 --retry 2 -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | timeout 180 bash
+      - name: Log in to registry
+        shell: bash
+        env:
+          YC_CLI_KEY: ${{ secrets.YC_CLI_KEY }}
+          YC_IAM_TOKEN: ${{ secrets.YC_IAM_TOKEN }}
+        run: |
+          if [[ -n "$YC_IAM_TOKEN" ]]; then
+            IAM_TOKEN="$YC_IAM_TOKEN"
+          else
+            test -n "$YC_CLI_KEY"
+            key_file="$(mktemp)"
+            trap 'rm -f "$key_file"' EXIT
+            printf '%s' "$YC_CLI_KEY" | base64 -d > "$key_file"
+            /home/runner/yandex-cloud/bin/yc config set service-account-key "$key_file"
+            IAM_TOKEN=$(/home/runner/yandex-cloud/bin/yc iam create-token)
+          fi
+          printf '%s' "$IAM_TOKEN" | docker login --username iam --password-stdin cr.yandex
+      - name: Push image
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag || 'main' }}
+        run: docker push "$IMAGE:$IMAGE_TAG"

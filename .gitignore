@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.npm-cache/
+*.tsbuildinfo
+*.log
+.env*
+!.env.example
+.idea/
+.DS_Store

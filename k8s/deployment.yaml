@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: max4j-docs
+  namespace: default
+  labels:
+    app: max4j-docs
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: max4j-docs
+  template:
+    metadata:
+      labels:
+        app: max4j-docs
+    spec:
+      containers:
+        - name: max4j-docs
+          image: cr.yandex/crplfa8eqvo7nvc0abpg/app/max4j-docs:main
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 2
+          resources:
+            requests:
+              cpu: 25m
+              memory: 48Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            capabilities:
+              drop: [ALL]
+      imagePullSecrets:
+        - name: yc-regcred
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
