@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import packageInfo from '../package.json';
 import './style.css';
 
 type SectionId = 'overview' | 'quickstart' | 'core' | 'spring' | 'webhook' | 'reference' | 'operations' | 'help';
@@ -16,9 +17,8 @@ const navigation: NavItem[] = [
   { id: 'help', title: 'Вопросы и ссылки', group: 'Справочник', keywords: 'github issue documentation faq' },
 ];
 
-const dependency = `<dependency>\n  <groupId>io.max4j</groupId>\n  <artifactId>spring-boot-3-starter</artifactId>\n  <version>0.4.2</version>\n</dependency>`;
-const boot4Dependency = `<dependency>\n  <groupId>io.max4j</groupId>\n  <artifactId>spring-boot-4-starter</artifactId>\n  <version>0.4.2</version>\n</dependency>`;
-const coreDependency = `<dependency>\n  <groupId>io.max4j</groupId>\n  <artifactId>core</artifactId>\n  <version>0.4.2</version>\n</dependency>`;
+const dependency = (artifactId: string, version: string) => `<dependency>\n  <groupId>io.max4j</groupId>\n  <artifactId>${artifactId}</artifactId>\n  <version>${version}</version>\n</dependency>`;
+const versionPattern = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 const coreCode = `import io.max4j.core.MaxClient;\nimport io.max4j.core.model.BotInfo;\n\nMaxClient max = MaxClient.create(System.getenv("MAX_BOT_TOKEN"));\nBotInfo me = max.bots().getMyInfo();\nSystem.out.println(me.getUsername());`;
 const yaml = `max4j:\n  enabled: true\n  token: \${MAX_BOT_TOKEN}\n  connect-timeout: 10s\n  read-timeout: 30s`;
 const webhookYaml = `max4j:\n  enabled: true\n  token: \${MAX_BOT_TOKEN}\n  webhook:\n    enabled: true\n    path: /max/webhook\n    secret: \${MAX_WEBHOOK_SECRET}`;
@@ -58,11 +58,32 @@ function SectionHead({ eyebrow, title, text, id }: { eyebrow: string; title: str
 }
 
 function App() {
+  const [version, setVersion] = React.useState(packageInfo.version);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [active, setActive] = React.useState<SectionId>('overview');
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const refreshVersion = async () => {
+      try {
+        const response = await fetch('/config/version.json', { cache: 'no-store' });
+        if (!response.ok) return;
+        const config: unknown = await response.json();
+        if (mounted && typeof config === 'object' && config !== null && 'version' in config
+          && typeof config.version === 'string' && versionPattern.test(config.version)) {
+          setVersion(config.version);
+        }
+      } catch {
+        // Keep the last known version if the configuration is temporarily unavailable.
+      }
+    };
+    void refreshVersion();
+    const timer = window.setInterval(() => { void refreshVersion(); }, 60_000);
+    return () => { mounted = false; window.clearInterval(timer); };
+  }, []);
 
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -100,7 +121,7 @@ function App() {
 
     <div className="layout">
       <aside className={`sidebar ${menuOpen ? 'is-open' : ''}`} aria-label="Разделы документации"><div className="sidebar-inner">
-        <div className="version-picker"><span className="version-light" /> <span>Документация</span><strong>v0.4.2</strong></div>
+        <div className="version-picker"><span className="version-light" /> <span>Документация</span><strong>v{version}</strong></div>
         {['Начало', 'Работа с API', 'Справочник'].map(group => <div className="nav-group" key={group}><p>{group}</p>{navigation.filter(item => item.group === group).map(item => <a key={item.id} href={`#${item.id}`} className={active === item.id ? 'active' : ''} onClick={() => setMenuOpen(false)}>{item.title}</a>)}</div>)}
         <div className="sidebar-bottom"><span className="mini-line" />Создано для Java-разработчиков.<br />Независимый open source проект.</div>
       </div></aside>
@@ -116,16 +137,16 @@ function App() {
         <div className="content-wrap">
           <div className="intro-grid"><a href="#quickstart" className="intro-card"><span className="intro-icon">01</span><h3>Быстрый старт</h3><p>Подключите зависимость, передайте токен и проверьте связь с MAX.</p><Arrow /></a><a href="#spring" className="intro-card"><span className="intro-icon">02</span><h3>Spring Boot</h3><p>Автоконфигурация клиента и приём обновлений в вашем приложении.</p><Arrow /></a><a href="#reference" className="intro-card"><span className="intro-icon">03</span><h3>Методы API</h3><p>Сообщения, чаты, подписки и другие группы под рукой.</p><Arrow /></a></div>
 
-          <SectionHead id="quickstart" eyebrow="01 / ПЕРВЫЕ ШАГИ" title="Запустите первого бота" text="Достаточно токена бота из MAX и одной Maven-зависимости. Примеры относятся к версии 0.4.2." />
-          <div className="steps"><div><span>1</span><h3>Добавьте starter</h3><p>Для Spring Boot 3 используйте готовую автоконфигурацию. Для приложения без Spring — модуль core.</p></div><Code label="pom.xml · Spring Boot 3" value={dependency} /><div><span>2</span><h3>Укажите токен</h3><p>Храните токен в переменной окружения. Starter создаст <code>MaxClient</code> и API beans.</p></div><Code label="application.yaml" value={yaml} /></div>
+          <SectionHead id="quickstart" eyebrow="01 / ПЕРВЫЕ ШАГИ" title="Запустите первого бота" text={`Достаточно токена бота из MAX и одной Maven-зависимости. Примеры относятся к версии ${version}.`} />
+          <div className="steps"><div><span>1</span><h3>Добавьте starter</h3><p>Для Spring Boot 3 используйте готовую автоконфигурацию. Для приложения без Spring — модуль core.</p></div><Code label="pom.xml · Spring Boot 3" value={dependency('spring-boot-3-starter', version)} /><div><span>2</span><h3>Укажите токен</h3><p>Храните токен в переменной окружения. Starter создаст <code>MaxClient</code> и API beans.</p></div><Code label="application.yaml" value={yaml} /></div>
           <div className="note"><span className="note-symbol">↗</span><div><strong>Уже есть бот?</strong><p>Создайте токен в MAX для бизнеса и передайте его как <code>MAX_BOT_TOKEN</code>. Не добавляйте токен в Git.</p></div><a href="https://dev.max.ru/docs-api" target="_blank" rel="noreferrer">Документация MAX <Arrow diagonal /></a></div>
 
           <SectionHead id="core" eyebrow="02 / БЕЗ SPRING" title="Прямой доступ к API" text="Модуль core подходит для обычного Java-приложения, консольного инструмента или вашего собственного фреймворка." />
-          <div className="split-block"><div><h3>Один клиент — группы методов</h3><p><code>MaxClient</code> создаёт типизированные API-группы по мере обращения. Базовый URL и таймауты можно настроить через builder.</p><div className="tag-row"><span>bots</span><span>messages</span><span>chats</span><span>subscriptions</span></div></div><div><Code label="pom.xml · Core" value={coreDependency} /><Code label="Java · Проверка связи" value={coreCode} /></div></div>
+          <div className="split-block"><div><h3>Один клиент — группы методов</h3><p><code>MaxClient</code> создаёт типизированные API-группы по мере обращения. Базовый URL и таймауты можно настроить через builder.</p><div className="tag-row"><span>bots</span><span>messages</span><span>chats</span><span>subscriptions</span></div></div><div><Code label="pom.xml · Core" value={dependency('core', version)} /><Code label="Java · Проверка связи" value={coreCode} /></div></div>
 
           <SectionHead id="spring" eyebrow="03 / АВТОКОНФИГУРАЦИЯ" title="Spring Boot без лишней настройки" text="Starter подключает клиент и группы MAX API через обычные Spring beans. Webhook включается отдельно." />
           <div className="feature-grid"><div className="feature"><span>◎</span><h3>Spring Boot 3</h3><p>Starter <code>spring-boot-3-starter</code> подключает клиент и свойства <code>max4j</code>.</p></div><div className="feature"><span>◇</span><h3>Spring Boot 4</h3><p>Отдельный <code>spring-boot-4-starter</code> работает с Java 25.</p></div><div className="feature"><span>⏱</span><h3>Контроль соединения</h3><p>Задайте <code>connect-timeout</code>, <code>read-timeout</code> или свой <code>base-url</code> при необходимости.</p></div></div>
-          <div className="boot4-dependency"><Code label="pom.xml · Spring Boot 4 · Java 25" value={boot4Dependency} /></div>
+          <div className="boot4-dependency"><Code label="pom.xml · Spring Boot 4 · Java 25" value={dependency('spring-boot-4-starter', version)} /></div>
 
           <SectionHead id="webhook" eyebrow="04 / СОБЫТИЯ" title="Получайте обновления" text="Для постоянно работающего бота используйте webhook: MAX отправит событие вашему HTTPS-адресу, а starter передаст его обработчику." />
           <div className="webhook-flow"><div><span>01</span>MAX Bot API</div><b>→</b><div><span>02</span>Webhook endpoint</div><b>→</b><div><span>03</span>Ваш обработчик</div></div>

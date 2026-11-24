@@ -25,11 +25,15 @@ spec:
     spec:
       containers:
         - name: max4j-docs
-          image: cr.yandex/crplfa8eqvo7nvc0abpg/app/max4j-docs:0.4.2
+          image: cr.yandex/crplfa8eqvo7nvc0abpg/app/max4j-docs:0.4.2-runtime-config
           imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 3000
+          volumeMounts:
+            - name: site-config
+              mountPath: /usr/share/nginx/html/config
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /healthz
@@ -58,6 +62,10 @@ spec:
               drop: [ALL]
       imagePullSecrets:
         - name: yc-regcred
+      volumes:
+        - name: site-config
+          configMap:
+            name: max4j-docs-config
       securityContext:
         seccompProfile:
           type: RuntimeDefault

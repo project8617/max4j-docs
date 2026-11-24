@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: max4j-docs-config
+  namespace: default
+data:
+  version.json: |
+    {"version":"0.4.2"}
